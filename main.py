@@ -2,6 +2,7 @@ import json
 import asyncio
 from helpers import DB
 from telethon import TelegramClient, events, types
+from telethon.errors import SessionPasswordNeededError
 from time import sleep
 import logging
 logging.basicConfig(level=logging.DEBUG)
@@ -58,7 +59,7 @@ async def main():
         value = input("Enter login code: ")
         try:
             me = await client.sign_in(phone, code=value)
-        except telethon.errors.SessionPasswordNeededError:
+        except SessionPasswordNeededError:
             password = input("Enter password: ")
             me = await client.sign_in(password=password)
     try:
