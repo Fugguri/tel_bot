@@ -1,11 +1,10 @@
+from pyrogram import Client
+from pyrogram.enums import ChatType
 import json
-import asyncio
 from helpers import DB
-from telethon import TelegramClient, events, types
-from telethon.errors import SessionPasswordNeededError
 from time import sleep
-import logging
-logging.basicConfig(level=logging.DEBUG)
+# import logging
+# logging.basicConfig(level=logging.DEBUG)
 with open("config.json", "rb") as file:
     data = json.load(file)
     api_id = data["api_id"]
@@ -13,29 +12,29 @@ with open("config.json", "rb") as file:
     phone = data["phone"]
     group_link = data["group_link"]
     TIMEOUT = data["TIMEOUT"]
-client = TelegramClient(phone, api_id, api_hash)
+
 db = DB("bot.db")
 db.create()
 
+app = Client(phone, api_id, api_hash, phone_number=phone)
 
-async def message(event):
 
-    sender = await event.get_sender()
-
-    sender_id = sender.id
-    """Проверяем, сообщение пришло в группу или в лс"""
+@app.on_message()
+async def my_handler(client, message):
+    sender_id = message.from_user.id
     try:
-        if type(event.original_update) == types.UpdateNewChannelMessage and not event.sender.bot:
+        if message.chat.type in (ChatType.GROUP, ChatType.SUPERGROUP, ChatType.BOT) and not message.from_user.is_bot:
             """если id пользователя не существует в таблице"""
             if not db.is_user_exist(sender_id):
+                print(message)
                 db.add_user(sender_id)  # Добавляем id пользователя в список
-                chat_id = event.chat_id
-                message_id = event.message.id
-                chat_from = await event.client.get_entity(chat_id)
+                chat_id = message.chat.id
+                message_id = message.id
+                chat_from = message.chat.username
                 message_link = "t.me/" + \
-                    chat_from.username + "/" + str(message_id)
+                    chat_from + "/" + str(message_id)
                 """Пересылаем сообщение в группу"""
-                await event.client.send_message(entity=group_link, message=message_link)
+                await app.send_message(group_link, message_link)
                 # Ожидаем заданный промежуток времени
                 sleep(TIMEOUT)
             # else:
@@ -51,22 +50,7 @@ async def message(event):
     except:
         pass
 
-
-async def main():
-    await client.connect()
-    if not await client.is_user_authorized():
-        await client.send_code_request(phone, force_sms=False)
-        value = input("Enter login code: ")
-        try:
-            me = await client.sign_in(phone, code=value)
-        except SessionPasswordNeededError:
-            password = input("Enter password: ")
-            me = await client.sign_in(password=password)
-    try:
-        client.add_event_handler(message, events.NewMessage)
-        await client.run_until_disconnected()
-    except Exception as ex:
-        print(ex)
-
-if __name__ == "__main__":
-    asyncio.run(main())
+try:
+    app.run()
+except:
+    pass
